@@ -237,7 +237,7 @@ class ReacherWrapper(DMControlBaseEnv):
             action = action.cpu().numpy().flatten()
 
         x = self.env.step(action)
-        self.steps += 0
+        self.steps += 1
 
         reward = self.reward
         done = x.reward
