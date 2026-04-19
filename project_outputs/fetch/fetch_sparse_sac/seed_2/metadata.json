@@ -1,0 +1,10 @@
+{
+  "algo": "SAC",
+  "env_id": "FetchReach-v4",
+  "experiment": "fetch_sparse_sac",
+  "minimum_time": false,
+  "policy": "MultiInputPolicy",
+  "seed": 2,
+  "terminate_on_success": false,
+  "total_timesteps": 250000
+}

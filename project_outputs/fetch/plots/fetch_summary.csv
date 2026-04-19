@@ -1,0 +1,6 @@
+,mean_reward,mean_reward,success_rate,success_rate,mean_ep_length,mean_ep_length
+,mean,std,mean,std,mean,std
+experiment,,,,,,
+fetch_dense_sac,-0.6895501182541084,0.34610165471252785,1.0,0.0,50.0,0.0
+fetch_sparse_sac,-1.7166666666666668,0.37527767497325676,1.0,0.0,50.0,0.0
+fetch_sparse_sac_her,-1.7166666666666668,0.3511884584284245,1.0,0.0,50.0,0.0

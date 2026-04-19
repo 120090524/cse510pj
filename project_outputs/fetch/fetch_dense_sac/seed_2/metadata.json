@@ -1,0 +1,10 @@
+{
+  "algo": "SAC",
+  "env_id": "FetchReachDense-v4",
+  "experiment": "fetch_dense_sac",
+  "minimum_time": false,
+  "policy": "MultiInputPolicy",
+  "seed": 2,
+  "terminate_on_success": false,
+  "total_timesteps": 250000
+}

@@ -1,0 +1,9 @@
+{
+  "algo": "SAC",
+  "env_id": "MountainCarContinuous-v0",
+  "experiment": "mountaincar_sparse_sac",
+  "policy": "MlpPolicy",
+  "reward_mode": "sparse",
+  "seed": 0,
+  "total_timesteps": 30000
+}

@@ -1,0 +1,10 @@
+{
+  "algo": "SAC+HER",
+  "env_id": "FetchReach-v4",
+  "experiment": "fetch_sparse_sac_her",
+  "goal_selection_strategy": "future",
+  "n_sampled_goal": 4,
+  "policy": "MultiInputPolicy",
+  "seed": 0,
+  "total_timesteps": 250000
+}

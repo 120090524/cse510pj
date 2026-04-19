@@ -1,0 +1,37 @@
+# Put this folder under your repo root as ./project/
+# Then activate the sparse-fetch environment and run these commands.
+
+# Smoke tests
+python project/train_mountaincar_sac.py --reward_mode dense --seed 0 --total_timesteps 20000
+python project/train_mountaincar_sac.py --reward_mode sparse --seed 0 --total_timesteps 20000
+python project/train_fetch_sac.py --env_id FetchReachDense-v4 --seed 0 --total_timesteps 30000
+python project/train_fetch_sac.py --env_id FetchReach-v4 --seed 0 --total_timesteps 30000
+python project/train_fetch_her.py --env_id FetchReach-v4 --seed 0 --total_timesteps 30000
+
+# Final MountainCar runs
+python project/train_mountaincar_sac.py --reward_mode dense --seed 0 --total_timesteps 150000
+python project/train_mountaincar_sac.py --reward_mode dense --seed 1 --total_timesteps 150000
+python project/train_mountaincar_sac.py --reward_mode dense --seed 2 --total_timesteps 150000
+python project/train_mountaincar_sac.py --reward_mode sparse --seed 0 --total_timesteps 150000
+python project/train_mountaincar_sac.py --reward_mode sparse --seed 1 --total_timesteps 150000
+python project/train_mountaincar_sac.py --reward_mode sparse --seed 2 --total_timesteps 150000
+
+# Final Fetch runs
+python project/train_fetch_sac.py --env_id FetchReachDense-v4 --seed 0 --total_timesteps 250000
+python project/train_fetch_sac.py --env_id FetchReachDense-v4 --seed 1 --total_timesteps 250000
+python project/train_fetch_sac.py --env_id FetchReachDense-v4 --seed 2 --total_timesteps 250000
+python project/train_fetch_sac.py --env_id FetchReach-v4 --seed 0 --total_timesteps 250000
+python project/train_fetch_sac.py --env_id FetchReach-v4 --seed 1 --total_timesteps 250000
+python project/train_fetch_sac.py --env_id FetchReach-v4 --seed 2 --total_timesteps 250000
+python project/train_fetch_her.py --env_id FetchReach-v4 --seed 0 --total_timesteps 250000
+python project/train_fetch_her.py --env_id FetchReach-v4 --seed 1 --total_timesteps 250000
+python project/train_fetch_her.py --env_id FetchReach-v4 --seed 2 --total_timesteps 250000
+
+# Optional paper-like minimum-time Fetch variant
+python project/train_fetch_sac.py --env_id FetchReach-v4 --minimum_time --terminate_on_success --seed 0 --total_timesteps 250000
+python project/train_fetch_sac.py --env_id FetchReach-v4 --minimum_time --terminate_on_success --seed 1 --total_timesteps 250000
+python project/train_fetch_sac.py --env_id FetchReach-v4 --minimum_time --terminate_on_success --seed 2 --total_timesteps 250000
+
+# Plotting
+python project/plot_results.py --task mountaincar --root_dir ./project_outputs --output_dir ./project_plots
+python project/plot_results.py --task fetch --root_dir ./project_outputs --output_dir ./project_plots

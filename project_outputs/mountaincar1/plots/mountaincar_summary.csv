@@ -1,0 +1,5 @@
+,mean_reward,mean_reward,success_rate,success_rate,mean_ep_length,mean_ep_length
+,mean,std,mean,std,mean,std
+experiment,,,,,,
+mountaincar_dense_sac,-0.0012217211187681,0.00043535169632530595,0.0,0.0,999.0,0.0
+mountaincar_sparse_sac,-999.0,0.0,0.0,0.0,999.0,0.0

@@ -1,0 +1,65 @@
+{
+    "env": "dm_reacher_easy",
+    "seed": 0,
+    "N": 201000,
+    "timeout": 25,
+    "reward": -1,
+    "reset_penalty_steps": 20,
+    "tol": 0.009,
+    "pos_tol": 0.1,
+    "vel_tol": 0.05,
+    "dt": 0.2,
+    "clamp_action": 1,
+    "maze_type": "small",
+    "reward_type": "sparse",
+    "replay_buffer_capacity": 100000,
+    "init_steps": 1000,
+    "update_every": 2,
+    "update_epochs": 1,
+    "batch_size": 256,
+    "gamma": 0.99,
+    "bootstrap_terminal": 0,
+    "normalize_obs": false,
+    "betas": [
+        0.9,
+        0.999
+    ],
+    "actor_lr": 0.0003,
+    "update_actor_every": 1,
+    "critic_lr": 0.0003,
+    "critic_tau": 0.005,
+    "update_critic_target_every": 1,
+    "init_temperature": 0.1,
+    "alpha_lr": 0.0003,
+    "encoder_tau": 0.005,
+    "l2_reg": 0.0001,
+    "actor_hidden_sizes": "256,256",
+    "critic_hidden_sizes": "256,256",
+    "nn_activation": "relu",
+    "use_normal_init": false,
+    "init_policy_test": false,
+    "results_dir": "./results/dm_reacher_easy_timeout25",
+    "checkpoint": 5000,
+    "model_checkpoint": 0,
+    "device": "cpu",
+    "actor_nn_params": {
+        "mlp": {
+            "hidden_sizes": [
+                256,
+                256
+            ],
+            "activation": "relu"
+        }
+    },
+    "critic_nn_params": {
+        "mlp": {
+            "hidden_sizes": [
+                256,
+                256
+            ],
+            "activation": "relu"
+        }
+    },
+    "obs_dim": 6,
+    "action_dim": 2
+}
