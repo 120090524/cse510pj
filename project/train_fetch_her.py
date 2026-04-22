@@ -11,9 +11,10 @@ from train_common import save_metadata, set_global_seed, wrap_monitor
 from wrappers import make_fetch_env, register_robotics_envs
 
 
-
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train SAC+HER on FetchReach sparse rewards.")
+    parser = argparse.ArgumentParser(
+        description="Train SAC+HER on FetchReach sparse or minimum-time rewards."
+    )
     parser.add_argument("--env_id", type=str, default="FetchReach-v4")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--total_timesteps", type=int, default=250_000)
@@ -27,26 +28,50 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--goal_selection_strategy", type=str, default="future")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--outdir", type=str, default="./project_outputs/fetch")
-    return parser.parse_args()
 
+    # New flags for the second innovation: HER + minimum-time wrapper.
+    parser.add_argument(
+        "--minimum_time",
+        action="store_true",
+        help="Use the HER-compatible minimum-time Fetch wrapper.",
+    )
+    parser.add_argument(
+        "--terminate_on_success",
+        action="store_true",
+        help="When using --minimum_time, terminate an episode once the goal is reached.",
+    )
+    return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     if "Dense" in args.env_id:
-        raise ValueError("Use the sparse FetchReach env for HER, e.g. FetchReach-v4.")
+        raise ValueError("Use a sparse Fetch env for HER, e.g. FetchReach-v4, not FetchReachDense-v4.")
 
     set_global_seed(args.seed)
     register_robotics_envs()
 
-    exp_name = "fetch_sparse_sac_her"
+    exp_name = "fetch_min_time_sac_her" if args.minimum_time else "fetch_sparse_sac_her"
     run_dir = Path(args.outdir) / exp_name / f"seed_{args.seed}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    env = wrap_monitor(make_fetch_env(args.env_id, seed=args.seed, minimum_time=False), run_dir)
+    env = wrap_monitor(
+        make_fetch_env(
+            args.env_id,
+            seed=args.seed,
+            minimum_time=args.minimum_time,
+            terminate_on_success=args.terminate_on_success,
+        ),
+        run_dir,
+    )
 
     def eval_env_fn():
-        return make_fetch_env(args.env_id, seed=args.seed + 10_000, minimum_time=False)
+        return make_fetch_env(
+            args.env_id,
+            seed=args.seed + 10_000,
+            minimum_time=args.minimum_time,
+            terminate_on_success=args.terminate_on_success,
+        )
 
     callback = EvalCSVCallback(
         eval_env_fn=eval_env_fn,
@@ -84,6 +109,8 @@ def main() -> None:
             "total_timesteps": args.total_timesteps,
             "algo": "SAC+HER",
             "policy": "MultiInputPolicy",
+            "minimum_time": args.minimum_time,
+            "terminate_on_success": args.terminate_on_success,
             "n_sampled_goal": args.n_sampled_goal,
             "goal_selection_strategy": args.goal_selection_strategy,
         },

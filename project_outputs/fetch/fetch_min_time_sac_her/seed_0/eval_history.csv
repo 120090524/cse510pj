@@ -1,0 +1,4 @@
+timesteps,mean_reward,std_reward,success_rate,mean_ep_length,mean_steps_to_success_or_timeout,mean_steps_to_success_success_only
+1000,-50.0,0.0,0.0,50.0,50.0,nan
+2000,-50.0,0.0,0.0,50.0,50.0,nan
+3000,-50.0,0.0,0.0,50.0,50.0,nan

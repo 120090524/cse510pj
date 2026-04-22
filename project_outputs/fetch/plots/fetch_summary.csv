@@ -1,6 +1,9 @@
-,mean_reward,mean_reward,success_rate,success_rate,mean_ep_length,mean_ep_length
-,mean,std,mean,std,mean,std
-experiment,,,,,,
-fetch_dense_sac,-0.6895501182541084,0.34610165471252785,1.0,0.0,50.0,0.0
-fetch_sparse_sac,-1.7166666666666668,0.37527767497325676,1.0,0.0,50.0,0.0
-fetch_sparse_sac_her,-1.7166666666666668,0.3511884584284245,1.0,0.0,50.0,0.0
+,success_rate,success_rate,mean_reward,mean_reward,mean_ep_length,mean_ep_length,mean_steps_to_success_or_timeout,mean_steps_to_success_or_timeout,mean_steps_to_success_success_only,mean_steps_to_success_success_only
+,mean,std,mean,std,mean,std,mean,std,mean,std
+experiment,,,,,,,,,,
+fetch_dense_sac,1.0,0.0,-0.6895501182541084,0.34610165471252785,50.0,0.0,,,,
+fetch_her_to_min_time_sac,1.0,0.0,-1.7166666666666668,0.35472994422987947,2.716666666666667,0.35472994422987947,2.716666666666667,0.35472994422987947,2.716666666666667,0.35472994422987947
+fetch_min_time_sac,1.0,0.0,-1.7166666666666666,0.32532035493238554,2.716666666666667,0.3253203549323854,2.716666666666667,0.3253203549323854,2.716666666666667,0.3253203549323854
+fetch_min_time_sac_her,0.0,,-50.0,,50.0,,50.0,,,
+fetch_sparse_sac,1.0,0.0,-1.7166666666666668,0.37527767497325676,50.0,0.0,,,,
+fetch_sparse_sac_her,0.6666666666666666,0.5773502691896258,-17.933333333333334,27.770953050504644,50.0,0.0,50.0,,,

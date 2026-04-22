@@ -1,0 +1,12 @@
+{
+  "algo": "SAC fine-tuning from SAC+HER policy",
+  "env_id": "FetchReach-v4",
+  "experiment": "fetch_her_to_min_time_sac",
+  "finetune_timesteps": 100000,
+  "learning_starts": 0,
+  "minimum_time": true,
+  "policy": "MultiInputPolicy",
+  "pretrained_model_path": "./project_outputs/fetch/fetch_sparse_sac_her/seed_0/best_model.zip",
+  "seed": 0,
+  "terminate_on_success": true
+}

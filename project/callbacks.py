@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 import gymnasium as gym
 import numpy as np
@@ -44,14 +44,26 @@ class EvalCSVCallback(BaseCallback):
             return
         with self.csv_path.open("w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["timesteps", "mean_reward", "std_reward", "success_rate", "mean_ep_length"])
+            writer.writerow(
+                [
+                    "timesteps",
+                    "mean_reward",
+                    "std_reward",
+                    "success_rate",
+                    "mean_ep_length",
+                    "mean_steps_to_success_or_timeout",
+                    "mean_steps_to_success_success_only",
+                ]
+            )
         self._initialized_file = True
 
-    def _evaluate(self) -> tuple[float, float, float, float]:
+    def _evaluate(self) -> tuple[float, float, float, float, float, float]:
         env = self.eval_env_fn()
         rewards: list[float] = []
         successes: list[float] = []
         lengths: list[int] = []
+        steps_to_success_or_timeout: list[int] = []
+        steps_to_success_success_only: list[int] = []
 
         for _ in range(self.n_eval_episodes):
             obs, info = env.reset()
@@ -59,6 +71,7 @@ class EvalCSVCallback(BaseCallback):
             ep_reward = 0.0
             ep_len = 0
             ep_success = 0.0
+            first_success_step: int | None = None
 
             while not done:
                 action, _ = self.model.predict(obs, deterministic=self.deterministic)
@@ -68,35 +81,66 @@ class EvalCSVCallback(BaseCallback):
                 done = bool(terminated or truncated)
 
                 if isinstance(obs, dict):
-                    ep_success = max(ep_success, infer_fetch_success(obs, info))
+                    current_success = infer_fetch_success(obs, info)
                 else:
-                    ep_success = max(ep_success, float(terminated and not truncated))
+                    current_success = float(terminated and not truncated)
+
+                ep_success = max(ep_success, current_success)
+                if current_success > 0.5 and first_success_step is None:
+                    first_success_step = ep_len
 
             rewards.append(ep_reward)
             successes.append(ep_success)
             lengths.append(ep_len)
 
+            if first_success_step is None:
+                steps_to_success_or_timeout.append(ep_len)
+            else:
+                steps_to_success_or_timeout.append(first_success_step)
+                steps_to_success_success_only.append(first_success_step)
+
         env.close()
+
+        if steps_to_success_success_only:
+            mean_success_only = float(np.mean(steps_to_success_success_only))
+        else:
+            mean_success_only = float("nan")
+
         return (
             float(np.mean(rewards)),
             float(np.std(rewards)),
             float(np.mean(successes)),
             float(np.mean(lengths)),
+            float(np.mean(steps_to_success_or_timeout)),
+            mean_success_only,
         )
 
     def _on_step(self) -> bool:
         if self.eval_freq > 0 and self.num_timesteps % self.eval_freq == 0:
-            mean_reward, std_reward, success_rate, mean_ep_length = self._evaluate()
+            (
+                mean_reward,
+                std_reward,
+                success_rate,
+                mean_ep_length,
+                mean_steps_to_success_or_timeout,
+                mean_steps_to_success_success_only,
+            ) = self._evaluate()
+
             with self.csv_path.open("a", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow([
-                    self.num_timesteps,
-                    mean_reward,
-                    std_reward,
-                    success_rate,
-                    mean_ep_length,
-                ])
+                writer.writerow(
+                    [
+                        self.num_timesteps,
+                        mean_reward,
+                        std_reward,
+                        success_rate,
+                        mean_ep_length,
+                        mean_steps_to_success_or_timeout,
+                        mean_steps_to_success_success_only,
+                    ]
+                )
 
+            # For min-time tasks, reward closer to zero also means faster success.
             score = success_rate + 1e-6 * mean_reward
             if score > self._best_score:
                 self._best_score = score
@@ -106,6 +150,7 @@ class EvalCSVCallback(BaseCallback):
                 print(
                     f"[Eval] steps={self.num_timesteps} "
                     f"reward={mean_reward:.3f}±{std_reward:.3f} "
-                    f"success={success_rate:.3f} len={mean_ep_length:.1f}"
+                    f"success={success_rate:.3f} len={mean_ep_length:.1f} "
+                    f"first_success_or_timeout={mean_steps_to_success_or_timeout:.1f}"
                 )
         return True

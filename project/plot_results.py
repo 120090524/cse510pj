@@ -7,14 +7,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Aggregate eval_history.csv files and make comparison plots.")
+    parser = argparse.ArgumentParser(
+        description="Aggregate eval_history.csv files and make comparison plots."
+    )
     parser.add_argument("--root_dir", type=str, default="./project_outputs")
     parser.add_argument("--task", choices=["mountaincar", "fetch"], required=True)
     parser.add_argument("--output_dir", type=str, default="./project_plots")
     return parser.parse_args()
-
 
 
 def collect_runs(root_dir: Path, prefix: str) -> pd.DataFrame:
@@ -26,10 +26,12 @@ def collect_runs(root_dir: Path, prefix: str) -> pd.DataFrame:
         df["experiment"] = experiment
         df["seed"] = seed
         records.append(df)
-    if not records:
-        raise FileNotFoundError(f"No eval_history.csv files found under {root_dir} for prefix={prefix!r}")
-    return pd.concat(records, ignore_index=True)
 
+    if not records:
+        raise FileNotFoundError(
+            f"No eval_history.csv files found under {root_dir} for prefix={prefix!r}"
+        )
+    return pd.concat(records, ignore_index=True)
 
 
 def plot_metric(df: pd.DataFrame, metric: str, title: str, output_path: Path) -> None:
@@ -37,7 +39,12 @@ def plot_metric(df: pd.DataFrame, metric: str, title: str, output_path: Path) ->
     for experiment, g in df.groupby("experiment"):
         agg = g.groupby("timesteps")[metric].agg(["mean", "std"]).reset_index()
         plt.plot(agg["timesteps"], agg["mean"], label=experiment)
-        plt.fill_between(agg["timesteps"], agg["mean"] - agg["std"], agg["mean"] + agg["std"], alpha=0.2)
+        plt.fill_between(
+            agg["timesteps"],
+            agg["mean"] - agg["std"],
+            agg["mean"] + agg["std"],
+            alpha=0.2,
+        )
     plt.xlabel("Timesteps")
     plt.ylabel(metric)
     plt.title(title)
@@ -48,26 +55,42 @@ def plot_metric(df: pd.DataFrame, metric: str, title: str, output_path: Path) ->
     plt.close()
 
 
-
 def main() -> None:
     args = parse_args()
     root_dir = Path(args.root_dir)
     output_dir = Path(args.output_dir)
-
     prefix = "mountaincar_" if args.task == "mountaincar" else "fetch_"
     df = collect_runs(root_dir, prefix)
 
-    plot_metric(df, "success_rate", f"{args.task}: success rate", output_dir / f"{args.task}_success_rate.png")
-    plot_metric(df, "mean_reward", f"{args.task}: mean reward", output_dir / f"{args.task}_mean_reward.png")
-    plot_metric(df, "mean_ep_length", f"{args.task}: episode length", output_dir / f"{args.task}_episode_length.png")
+    metrics = [
+        "success_rate",
+        "mean_reward",
+        "mean_ep_length",
+        "mean_steps_to_success_or_timeout",
+        "mean_steps_to_success_success_only",
+    ]
+    for metric in metrics:
+        if metric in df.columns:
+            plot_metric(
+                df,
+                metric,
+                f"{args.task}: {metric}",
+                output_dir / f"{args.task}_{metric}.png",
+            )
 
+    summary_metrics = [
+        col
+        for col in metrics
+        if col in df.columns
+    ]
     summary = (
         df.sort_values("timesteps")
         .groupby(["experiment", "seed"], as_index=False)
         .tail(1)
-        .groupby("experiment")[["mean_reward", "success_rate", "mean_ep_length"]]
+        .groupby("experiment")[summary_metrics]
         .agg(["mean", "std"])
     )
+
     output_dir.mkdir(parents=True, exist_ok=True)
     summary.to_csv(output_dir / f"{args.task}_summary.csv")
     print(summary)
