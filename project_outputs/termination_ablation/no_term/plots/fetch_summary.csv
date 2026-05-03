@@ -1,0 +1,4 @@
+experiment,num_seeds,success_rate_mean,success_rate_std,mean_reward_mean,mean_reward_std,mean_ep_length_mean,mean_ep_length_std,mean_steps_to_success_or_timeout_mean,mean_steps_to_success_or_timeout_std,mean_steps_to_success_success_only_mean,mean_steps_to_success_success_only_std,mean_final_distance_to_goal_mean,mean_final_distance_to_goal_std
+fetch_adhoc_shaping_sac,1,1.0,,-2.0403835803619588,,50.0,,2.35,,2.35,,0.0113016735762357,
+fetch_min_time_sac,1,0.95,,-10.45,,50.0,,5.95,,3.631578947368421,,0.0346698482986539,
+fetch_pbrs_sac,1,1.0,,-1.3395618636161088,,50.0,,2.4,,2.4,,0.0190572371706366,

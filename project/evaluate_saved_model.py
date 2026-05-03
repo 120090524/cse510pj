@@ -26,7 +26,6 @@ FETCH_REWARD_CHOICES = [
 ]
 
 
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a saved SAC model.")
     parser.add_argument("--model_path", type=str, required=True)
@@ -48,6 +47,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--potential_scale", type=float, default=1.0)
     parser.add_argument("--distance_scale", type=float, default=1.0)
+    parser.add_argument("--goal_offset_x", type=float, default=0.0)
+    parser.add_argument("--goal_offset_y", type=float, default=0.0)
+    parser.add_argument("--goal_offset_z", type=float, default=0.0)
+    parser.add_argument("--action_penalty_scale", type=float, default=0.0)
+    parser.add_argument("--shaping_threshold", type=float, default=None)
     parser.add_argument("--output_json", type=str, default="")
     parser.add_argument("--device", type=str, default="auto")
     return parser.parse_args()
@@ -84,6 +88,9 @@ def main() -> None:
             shaping_gamma=args.gamma,
             potential_scale=args.potential_scale,
             distance_scale=args.distance_scale,
+            goal_offset=[args.goal_offset_x, args.goal_offset_y, args.goal_offset_z],
+            action_penalty_scale=args.action_penalty_scale,
+            shaping_threshold=args.shaping_threshold,
         )
         policy_hint = "MultiInputPolicy"
 
@@ -137,6 +144,9 @@ def main() -> None:
         "task": args.task,
         "policy_hint": policy_hint,
         "reward_mode": reward_mode,
+        "goal_offset": [args.goal_offset_x, args.goal_offset_y, args.goal_offset_z],
+        "action_penalty_scale": args.action_penalty_scale,
+        "shaping_threshold": args.shaping_threshold,
         "mean_reward": float(np.mean(rewards)),
         "mean_success": float(np.mean(successes)),
         "mean_ep_length": float(np.mean(lengths)),

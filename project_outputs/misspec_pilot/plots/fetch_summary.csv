@@ -1,0 +1,10 @@
+experiment,num_seeds,success_rate_mean,success_rate_std,mean_reward_mean,mean_reward_std,mean_ep_length_mean,mean_ep_length_std,mean_steps_to_success_or_timeout_mean,mean_steps_to_success_or_timeout_std,mean_steps_to_success_success_only_mean,mean_steps_to_success_success_only_std,mean_final_distance_to_goal_mean,mean_final_distance_to_goal_std
+fetch_adhoc_actionpen_001,1,1.0,,-1.6010310453828425,,2.4,,2.4,,2.4,,0.0286604000255465,
+fetch_adhoc_actionpen_005,1,1.0,,-1.7811563099268823,,2.4,,2.4,,2.4,,0.0289382592309266,
+fetch_adhoc_offset_x01,1,1.0,,-1.5585143755655737,,2.4,,2.4,,2.4,,0.0283555108588188,
+fetch_adhoc_offset_y01,1,1.0,,-1.5534058293793351,,2.4,,2.4,,2.4,,0.0290429452899843,
+fetch_adhoc_offset_z01,1,1.0,,-1.5534233937039972,,2.4,,2.4,,2.4,,0.0289996229577809,
+fetch_adhoc_ref,1,1.0,,-1.5543874826747923,,2.4,,2.4,,2.4,,0.0289924238342791,
+fetch_adhoc_threshold_003,1,1.0,,-1.4863994119688868,,2.4,,2.4,,2.4,,0.0288355635944753,
+fetch_adhoc_threshold_008,1,1.0,,-1.4238381084054708,,2.4,,2.4,,2.4,,0.0287783838808536,
+fetch_pbrs_ref,1,1.0,,-1.3499284190125764,,2.4,,2.4,,2.4,,0.030741070699878,

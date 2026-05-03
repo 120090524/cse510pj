@@ -1,0 +1,21 @@
+{
+  "action_penalty_scale": 0.0,
+  "algo": "SAC",
+  "distance_scale": 1.0,
+  "env_id": "FetchReach-v4",
+  "experiment": "fetch_adhoc_ref",
+  "gamma": 0.99,
+  "goal_offset": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "minimum_time_flag": false,
+  "policy": "MultiInputPolicy",
+  "potential_scale": 1.0,
+  "reward_mode": "adhoc_distance",
+  "seed": 0,
+  "shaping_threshold": null,
+  "terminate_on_success": true,
+  "total_timesteps": 60000
+}

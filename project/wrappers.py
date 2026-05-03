@@ -25,6 +25,7 @@ def resolve_fetch_env_id(env_id: str) -> str:
     return env_id
 
 
+
 def to_fetch_dense_env_id(env_id: str) -> str:
     """Convert FetchReach-v4 -> FetchReachDense-v4 if needed."""
     env_id = resolve_fetch_env_id(env_id)
@@ -142,12 +143,6 @@ class FetchMinimumTimeWrapper(gym.Wrapper):
         return fetch_is_success(achieved_goal, desired_goal, self.distance_threshold)
 
     def compute_reward(self, achieved_goal, desired_goal, info):
-        """
-        Vectorized reward function required by Stable-Baselines3 HerReplayBuffer.
-
-        achieved_goal and desired_goal may be shape (goal_dim,) for one transition
-        or shape (batch_size, goal_dim) for HER relabeling.
-        """
         success = self._is_success(achieved_goal, desired_goal)
         reward = np.where(success, self.success_reward, self.step_penalty)
         if np.isscalar(reward) or np.asarray(reward).shape == ():
@@ -244,8 +239,8 @@ class FetchPBRSMinTimeWrapper(gym.Wrapper):
         obs, raw_env_reward, terminated, truncated, info = self.env.step(action)
         ag = np.asarray(obs["achieved_goal"], dtype=np.float32)
         dg = np.asarray(obs["desired_goal"], dtype=np.float32)
-
         success = bool(self._is_success(ag, dg))
+
         base_reward = self.success_reward if success else self.step_penalty
         shaping_bonus = float(self.shaping_gamma * self._phi(ag, dg) - self._phi(prev_ag, prev_dg))
         reward = float(base_reward + shaping_bonus)
@@ -266,14 +261,24 @@ class FetchPBRSMinTimeWrapper(gym.Wrapper):
 
 class FetchAdHocDistanceWrapper(gym.Wrapper):
     """
-    Minimum-time reward plus a simple non-PBRS dense bonus.
+    Minimum-time reward plus a configurable non-PBRS dense bonus.
 
-    Reward:
-        r'(s, a, s') = r_base(s, a, s') - distance_scale * ||achieved_goal' - desired_goal||_2
+    Core control reward:
+        r'(s, a, s') = r_base(s, a, s') - distance_scale * D_shape(s')
 
-    This is a useful control because it is dense, but it is NOT potential-based shaping.
+    True task semantics remain unchanged:
+      - success is always measured against the REAL desired_goal and REAL env threshold
+      - base reward is always 0 on success, -1 otherwise
+      - terminate_on_success, if enabled, also uses the REAL desired_goal
+
+    Misspecification knobs affect only the shaping term:
+      1) goal_offset: use desired_goal + offset inside the shaping distance
+      2) action_penalty_scale: add -lambda ||a||^2 to the shaping term
+      3) shaping_threshold: use max(distance_to_shaping_goal - shaping_threshold, 0)
+         instead of raw distance. If shaping_threshold is wrong, the dense guidance is wrong.
+
+    This wrapper is useful as a control because it is dense, but it is NOT potential-based.
     So it does not come with the policy-invariance guarantee from Ng et al. (1999).
-
     Like PBRS, this wrapper is intended for plain SAC training, not HER.
     """
 
@@ -285,6 +290,9 @@ class FetchAdHocDistanceWrapper(gym.Wrapper):
         success_reward: float = 0.0,
         terminate_on_success: bool = True,
         distance_threshold: float | None = None,
+        goal_offset: np.ndarray | None = None,
+        action_penalty_scale: float = 0.0,
+        shaping_threshold: float | None = None,
     ):
         super().__init__(env)
         self.distance_scale = float(distance_scale)
@@ -294,12 +302,29 @@ class FetchAdHocDistanceWrapper(gym.Wrapper):
         if distance_threshold is None:
             distance_threshold = getattr(env.unwrapped, "distance_threshold", FETCH_SUCCESS_DISTANCE)
         self.distance_threshold = float(distance_threshold)
+        if goal_offset is None:
+            goal_offset = np.zeros(3, dtype=np.float32)
+        self.goal_offset = np.asarray(goal_offset, dtype=np.float32).reshape(-1)
+        self.action_penalty_scale = float(action_penalty_scale)
+        self.shaping_threshold = None if shaping_threshold is None else float(shaping_threshold)
 
     def _goal_distance(self, achieved_goal: np.ndarray, desired_goal: np.ndarray) -> np.ndarray:
         return fetch_goal_distance(achieved_goal, desired_goal)
 
     def _is_success(self, achieved_goal: np.ndarray, desired_goal: np.ndarray) -> np.ndarray:
         return fetch_is_success(achieved_goal, desired_goal, self.distance_threshold)
+
+    def _shaping_goal(self, desired_goal: np.ndarray) -> np.ndarray:
+        return np.asarray(desired_goal, dtype=np.float32) + self.goal_offset
+
+    def _shaping_distance_raw(self, achieved_goal: np.ndarray, desired_goal: np.ndarray) -> np.ndarray:
+        return fetch_goal_distance(achieved_goal, self._shaping_goal(desired_goal))
+
+    def _shaping_distance_effective(self, achieved_goal: np.ndarray, desired_goal: np.ndarray) -> np.ndarray:
+        raw = self._shaping_distance_raw(achieved_goal, desired_goal)
+        if self.shaping_threshold is None:
+            return raw
+        return np.maximum(raw - self.shaping_threshold, 0.0)
 
     def compute_reward(self, achieved_goal, desired_goal, info):  # pragma: no cover - safety guard
         raise NotImplementedError(
@@ -311,21 +336,33 @@ class FetchAdHocDistanceWrapper(gym.Wrapper):
         obs, raw_env_reward, terminated, truncated, info = self.env.step(action)
         ag = np.asarray(obs["achieved_goal"], dtype=np.float32)
         dg = np.asarray(obs["desired_goal"], dtype=np.float32)
-        distance = float(self._goal_distance(ag, dg))
+
+        true_distance = float(self._goal_distance(ag, dg))
         success = bool(self._is_success(ag, dg))
 
+        shaping_distance_raw = float(self._shaping_distance_raw(ag, dg))
+        shaping_distance_effective = float(self._shaping_distance_effective(ag, dg))
+        action_penalty = float(self.action_penalty_scale * np.sum(np.square(np.asarray(action, dtype=np.float32))))
+
         base_reward = self.success_reward if success else self.step_penalty
-        shaping_bonus = -self.distance_scale * distance
+        shaping_bonus = -self.distance_scale * shaping_distance_effective - action_penalty
         reward = float(base_reward + shaping_bonus)
 
         terminated = bool(terminated) or (self.terminate_on_success and success)
 
         info = dict(info)
         info["is_success"] = float(success)
-        info["distance_to_goal"] = distance
+        info["distance_to_goal"] = true_distance
         info["raw_env_reward"] = float(raw_env_reward)
         info["base_reward"] = float(base_reward)
         info["shaping_bonus"] = float(shaping_bonus)
+        info["shaping_distance_raw"] = shaping_distance_raw
+        info["shaping_distance_effective"] = shaping_distance_effective
+        info["action_penalty_term"] = float(action_penalty)
+        info["shaping_threshold"] = self.shaping_threshold
+        info["goal_offset_x"] = float(self.goal_offset[0]) if self.goal_offset.size > 0 else 0.0
+        info["goal_offset_y"] = float(self.goal_offset[1]) if self.goal_offset.size > 1 else 0.0
+        info["goal_offset_z"] = float(self.goal_offset[2]) if self.goal_offset.size > 2 else 0.0
         return obs, reward, terminated, truncated, info
 
 
@@ -352,6 +389,7 @@ def make_mountaincar_env(reward_mode: str, seed: int | None = None) -> gym.Env:
     return env
 
 
+
 def make_fetch_env(
     env_id: str,
     seed: int | None = None,
@@ -361,6 +399,9 @@ def make_fetch_env(
     shaping_gamma: float = 0.99,
     potential_scale: float = 1.0,
     distance_scale: float = 1.0,
+    goal_offset: np.ndarray | None = None,
+    action_penalty_scale: float = 0.0,
+    shaping_threshold: float | None = None,
 ) -> gym.Env:
     """
     Create a Fetch env with backward compatibility.
@@ -407,6 +448,9 @@ def make_fetch_env(
                 env,
                 distance_scale=distance_scale,
                 terminate_on_success=terminate_on_success,
+                goal_offset=goal_offset,
+                action_penalty_scale=action_penalty_scale,
+                shaping_threshold=shaping_threshold,
             )
         else:
             raise ValueError(

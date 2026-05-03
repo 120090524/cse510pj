@@ -1,0 +1,14 @@
+{
+  "algo": "SAC",
+  "distance_scale": 1.0,
+  "env_id": "FetchReach-v4",
+  "experiment": "fetch_pbrs_sac",
+  "gamma": 0.99,
+  "minimum_time_flag": false,
+  "policy": "MultiInputPolicy",
+  "potential_scale": 0.5,
+  "reward_mode": "pbrs_min_time",
+  "seed": 0,
+  "terminate_on_success": false,
+  "total_timesteps": 100000
+}

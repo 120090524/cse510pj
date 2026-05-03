@@ -20,12 +20,11 @@ REWARD_MODE_CHOICES = [
 ]
 
 
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Train SAC on FetchReach with dense, sparse, minimum-time, "
-            "PBRS minimum-time, or ad-hoc dense shaping rewards."
+            "Train SAC on Fetch with dense, sparse, minimum-time, PBRS minimum-time, "
+            "or ad-hoc dense shaping rewards. Also supports ad-hoc misspecification stress tests."
         )
     )
     parser.add_argument("--env_id", type=str, default="FetchReach-v4")
@@ -71,6 +70,31 @@ def parse_args() -> argparse.Namespace:
         default=1.0,
         help="Coefficient beta for the non-PBRS ad-hoc dense shaping control.",
     )
+    # Misspecification stress-test knobs for adhoc_distance
+    parser.add_argument("--goal_offset_x", type=float, default=0.0)
+    parser.add_argument("--goal_offset_y", type=float, default=0.0)
+    parser.add_argument("--goal_offset_z", type=float, default=0.0)
+    parser.add_argument(
+        "--action_penalty_scale",
+        type=float,
+        default=0.0,
+        help="Extra action penalty lambda for misspecification stress tests: -lambda ||a||^2.",
+    )
+    parser.add_argument(
+        "--shaping_threshold",
+        type=float,
+        default=None,
+        help=(
+            "Optional shaping-only threshold tau. If set, adhoc shaping uses max(distance_to_shaping_goal - tau, 0). "
+            "The true success threshold remains unchanged."
+        ),
+    )
+    parser.add_argument(
+        "--experiment_name",
+        type=str,
+        default="",
+        help="Optional folder name override. Useful for misspecification variants so multiple adhoc runs do not overwrite each other.",
+    )
     parser.add_argument("--outdir", type=str, default="./project_outputs/fetch")
     return parser.parse_args()
 
@@ -106,9 +130,11 @@ def main() -> None:
     set_global_seed(args.seed)
     register_robotics_envs()
 
-    exp_name = experiment_name_from_reward_mode(reward_mode)
+    exp_name = args.experiment_name.strip() or experiment_name_from_reward_mode(reward_mode)
     run_dir = Path(args.outdir) / exp_name / f"seed_{args.seed}"
     run_dir.mkdir(parents=True, exist_ok=True)
+
+    goal_offset = [args.goal_offset_x, args.goal_offset_y, args.goal_offset_z]
 
     env = wrap_monitor(
         make_fetch_env(
@@ -120,6 +146,9 @@ def main() -> None:
             shaping_gamma=args.gamma,
             potential_scale=args.potential_scale,
             distance_scale=args.distance_scale,
+            goal_offset=goal_offset,
+            action_penalty_scale=args.action_penalty_scale,
+            shaping_threshold=args.shaping_threshold,
         ),
         run_dir,
     )
@@ -134,6 +163,9 @@ def main() -> None:
             shaping_gamma=args.gamma,
             potential_scale=args.potential_scale,
             distance_scale=args.distance_scale,
+            goal_offset=goal_offset,
+            action_penalty_scale=args.action_penalty_scale,
+            shaping_threshold=args.shaping_threshold,
         )
 
     callback = EvalCSVCallback(
@@ -174,6 +206,9 @@ def main() -> None:
             "gamma": args.gamma,
             "potential_scale": args.potential_scale,
             "distance_scale": args.distance_scale,
+            "goal_offset": goal_offset,
+            "action_penalty_scale": args.action_penalty_scale,
+            "shaping_threshold": args.shaping_threshold,
         },
     )
 
@@ -181,10 +216,14 @@ def main() -> None:
     print("Running Fetch SAC experiment")
     print(f"  env_id              : {args.env_id}")
     print(f"  reward_mode         : {reward_mode}")
+    print(f"  experiment_name     : {exp_name}")
     print(f"  terminate_on_success: {args.terminate_on_success}")
     print(f"  gamma               : {args.gamma}")
     print(f"  potential_scale     : {args.potential_scale}")
     print(f"  distance_scale      : {args.distance_scale}")
+    print(f"  goal_offset         : {goal_offset}")
+    print(f"  action_penalty_scale: {args.action_penalty_scale}")
+    print(f"  shaping_threshold   : {args.shaping_threshold}")
     print(f"  seed                : {args.seed}")
     print(f"  output              : {run_dir}")
     print("=" * 80)
