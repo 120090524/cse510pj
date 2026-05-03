@@ -10,9 +10,24 @@ from train_common import save_metadata, set_global_seed, wrap_monitor
 from wrappers import make_fetch_env, register_robotics_envs
 
 
+REWARD_MODE_CHOICES = [
+    "auto",
+    "official_dense",
+    "official_sparse",
+    "min_time",
+    "pbrs_min_time",
+    "adhoc_distance",
+]
+
+
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train SAC on FetchReach dense/sparse.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Train SAC on FetchReach with dense, sparse, minimum-time, "
+            "PBRS minimum-time, or ad-hoc dense shaping rewards."
+        )
+    )
     parser.add_argument("--env_id", type=str, default="FetchReach-v4")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--total_timesteps", type=int, default=250_000)
@@ -22,21 +37,76 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--buffer_size", type=int, default=500_000)
     parser.add_argument("--learning_rate", type=float, default=3e-4)
+    parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--minimum_time", action="store_true", help="Wrap sparse FetchReach into a paper-like min-time task.")
-    parser.add_argument("--terminate_on_success", action="store_true", help="When using --minimum_time, terminate the episode on success.")
+    parser.add_argument(
+        "--reward_mode",
+        type=str,
+        choices=REWARD_MODE_CHOICES,
+        default="auto",
+        help=(
+            "New interface. 'auto' keeps backward compatibility with the old script: "
+            "--minimum_time wins first; otherwise Dense in env_id -> official_dense; else official_sparse."
+        ),
+    )
+    parser.add_argument(
+        "--minimum_time",
+        action="store_true",
+        help="Backward-compatible flag. Equivalent to --reward_mode min_time when reward_mode=auto.",
+    )
+    parser.add_argument(
+        "--terminate_on_success",
+        action="store_true",
+        help="When using min_time / PBRS / ad-hoc shaping, terminate the episode on success.",
+    )
+    parser.add_argument(
+        "--potential_scale",
+        type=float,
+        default=1.0,
+        help="Potential coefficient alpha in Phi(s) = -alpha * distance for PBRS.",
+    )
+    parser.add_argument(
+        "--distance_scale",
+        type=float,
+        default=1.0,
+        help="Coefficient beta for the non-PBRS ad-hoc dense shaping control.",
+    )
     parser.add_argument("--outdir", type=str, default="./project_outputs/fetch")
     return parser.parse_args()
 
 
 
+def resolve_reward_mode(args: argparse.Namespace) -> str:
+    if args.reward_mode != "auto":
+        return args.reward_mode
+    if args.minimum_time:
+        return "min_time"
+    return "official_dense" if "Dense" in args.env_id else "official_sparse"
+
+
+
+def experiment_name_from_reward_mode(reward_mode: str) -> str:
+    mapping = {
+        "official_dense": "fetch_dense_sac",
+        "official_sparse": "fetch_sparse_sac",
+        "min_time": "fetch_min_time_sac",
+        "pbrs_min_time": "fetch_pbrs_sac",
+        "adhoc_distance": "fetch_adhoc_shaping_sac",
+    }
+    if reward_mode not in mapping:
+        raise ValueError(f"Unsupported reward_mode={reward_mode!r}")
+    return mapping[reward_mode]
+
+
+
 def main() -> None:
     args = parse_args()
+    reward_mode = resolve_reward_mode(args)
+
     set_global_seed(args.seed)
     register_robotics_envs()
 
-    reward_tag = "min_time" if args.minimum_time else ("dense" if "Dense" in args.env_id else "sparse")
-    exp_name = f"fetch_{reward_tag}_sac"
+    exp_name = experiment_name_from_reward_mode(reward_mode)
     run_dir = Path(args.outdir) / exp_name / f"seed_{args.seed}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -46,6 +116,10 @@ def main() -> None:
             seed=args.seed,
             minimum_time=args.minimum_time,
             terminate_on_success=args.terminate_on_success,
+            reward_mode=reward_mode,
+            shaping_gamma=args.gamma,
+            potential_scale=args.potential_scale,
+            distance_scale=args.distance_scale,
         ),
         run_dir,
     )
@@ -56,6 +130,10 @@ def main() -> None:
             seed=args.seed + 10_000,
             minimum_time=args.minimum_time,
             terminate_on_success=args.terminate_on_success,
+            reward_mode=reward_mode,
+            shaping_gamma=args.gamma,
+            potential_scale=args.potential_scale,
+            distance_scale=args.distance_scale,
         )
 
     callback = EvalCSVCallback(
@@ -75,6 +153,7 @@ def main() -> None:
         batch_size=args.batch_size,
         buffer_size=args.buffer_size,
         learning_rate=args.learning_rate,
+        gamma=args.gamma,
         verbose=1,
         tensorboard_log=str(run_dir / "tb"),
         device=args.device,
@@ -85,14 +164,30 @@ def main() -> None:
         {
             "experiment": exp_name,
             "env_id": args.env_id,
-            "minimum_time": args.minimum_time,
+            "reward_mode": reward_mode,
+            "minimum_time_flag": args.minimum_time,
             "terminate_on_success": args.terminate_on_success,
             "seed": args.seed,
             "total_timesteps": args.total_timesteps,
             "algo": "SAC",
             "policy": "MultiInputPolicy",
+            "gamma": args.gamma,
+            "potential_scale": args.potential_scale,
+            "distance_scale": args.distance_scale,
         },
     )
+
+    print("=" * 80)
+    print("Running Fetch SAC experiment")
+    print(f"  env_id              : {args.env_id}")
+    print(f"  reward_mode         : {reward_mode}")
+    print(f"  terminate_on_success: {args.terminate_on_success}")
+    print(f"  gamma               : {args.gamma}")
+    print(f"  potential_scale     : {args.potential_scale}")
+    print(f"  distance_scale      : {args.distance_scale}")
+    print(f"  seed                : {args.seed}")
+    print(f"  output              : {run_dir}")
+    print("=" * 80)
 
     model.learn(total_timesteps=args.total_timesteps, callback=callback, progress_bar=True)
     model.save(str(run_dir / "final_model"))

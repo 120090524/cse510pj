@@ -8,7 +8,7 @@ import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 
-from wrappers import infer_fetch_success
+from wrappers import infer_fetch_distance, infer_fetch_success
 
 
 class EvalCSVCallback(BaseCallback):
@@ -53,17 +53,20 @@ class EvalCSVCallback(BaseCallback):
                     "mean_ep_length",
                     "mean_steps_to_success_or_timeout",
                     "mean_steps_to_success_success_only",
+                    "mean_final_distance_to_goal",
                 ]
             )
         self._initialized_file = True
 
-    def _evaluate(self) -> tuple[float, float, float, float, float, float]:
+    def _evaluate(self) -> tuple[float, float, float, float, float, float, float]:
         env = self.eval_env_fn()
+
         rewards: list[float] = []
         successes: list[float] = []
         lengths: list[int] = []
         steps_to_success_or_timeout: list[int] = []
         steps_to_success_success_only: list[int] = []
+        final_distances: list[float] = []
 
         for _ in range(self.n_eval_episodes):
             obs, info = env.reset()
@@ -72,6 +75,7 @@ class EvalCSVCallback(BaseCallback):
             ep_len = 0
             ep_success = 0.0
             first_success_step: int | None = None
+            final_distance = float("nan")
 
             while not done:
                 action, _ = self.model.predict(obs, deterministic=self.deterministic)
@@ -82,8 +86,10 @@ class EvalCSVCallback(BaseCallback):
 
                 if isinstance(obs, dict):
                     current_success = infer_fetch_success(obs, info)
+                    final_distance = infer_fetch_distance(obs, info)
                 else:
                     current_success = float(terminated and not truncated)
+                    final_distance = float("nan")
 
                 ep_success = max(ep_success, current_success)
                 if current_success > 0.5 and first_success_step is None:
@@ -92,6 +98,7 @@ class EvalCSVCallback(BaseCallback):
             rewards.append(ep_reward)
             successes.append(ep_success)
             lengths.append(ep_len)
+            final_distances.append(final_distance)
 
             if first_success_step is None:
                 steps_to_success_or_timeout.append(ep_len)
@@ -101,10 +108,16 @@ class EvalCSVCallback(BaseCallback):
 
         env.close()
 
-        if steps_to_success_success_only:
-            mean_success_only = float(np.mean(steps_to_success_success_only))
-        else:
-            mean_success_only = float("nan")
+        mean_success_only = (
+            float(np.mean(steps_to_success_success_only))
+            if steps_to_success_success_only
+            else float("nan")
+        )
+        mean_final_distance = (
+            float(np.nanmean(final_distances))
+            if len(final_distances) > 0
+            else float("nan")
+        )
 
         return (
             float(np.mean(rewards)),
@@ -113,6 +126,7 @@ class EvalCSVCallback(BaseCallback):
             float(np.mean(lengths)),
             float(np.mean(steps_to_success_or_timeout)),
             mean_success_only,
+            mean_final_distance,
         )
 
     def _on_step(self) -> bool:
@@ -124,6 +138,7 @@ class EvalCSVCallback(BaseCallback):
                 mean_ep_length,
                 mean_steps_to_success_or_timeout,
                 mean_steps_to_success_success_only,
+                mean_final_distance_to_goal,
             ) = self._evaluate()
 
             with self.csv_path.open("a", newline="", encoding="utf-8") as f:
@@ -137,11 +152,17 @@ class EvalCSVCallback(BaseCallback):
                         mean_ep_length,
                         mean_steps_to_success_or_timeout,
                         mean_steps_to_success_success_only,
+                        mean_final_distance_to_goal,
                     ]
                 )
 
-            # For min-time tasks, reward closer to zero also means faster success.
-            score = success_rate + 1e-6 * mean_reward
+            # For shaping experiments, raw reward is not directly comparable across methods.
+            # Use behavior-based selection: high success, then fewer steps, then smaller final distance.
+            score = (
+                success_rate
+                - 1e-3 * mean_steps_to_success_or_timeout
+                - 1e-4 * (0.0 if np.isnan(mean_final_distance_to_goal) else mean_final_distance_to_goal)
+            )
             if score > self._best_score:
                 self._best_score = score
                 self.model.save(self.best_model_path.as_posix())
@@ -150,7 +171,8 @@ class EvalCSVCallback(BaseCallback):
                 print(
                     f"[Eval] steps={self.num_timesteps} "
                     f"reward={mean_reward:.3f}±{std_reward:.3f} "
-                    f"success={success_rate:.3f} len={mean_ep_length:.1f} "
-                    f"first_success_or_timeout={mean_steps_to_success_or_timeout:.1f}"
+                    f"success={success_rate:.3f} len={mean_ep_length:.2f} "
+                    f"first_success_or_timeout={mean_steps_to_success_or_timeout:.2f} "
+                    f"final_dist={mean_final_distance_to_goal:.4f}"
                 )
         return True
